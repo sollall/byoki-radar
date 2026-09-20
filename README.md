@@ -42,15 +42,17 @@ frontend/
 
 ## セットアップと起動
 
+依存関係の管理・実行には [uv](https://docs.astral.sh/uv/) を使用する。
+
 ```bash
 cd backend
-pip install -r requirements.txt
+uv sync
 
 # サンプルデータをExtract->Validation->Storeまで流し込む
-python -m app.seed
+uv run python -m app.seed
 
 # API起動
-uvicorn app.api:app --port 8811
+uv run uvicorn app.api:app --port 8811
 ```
 
 別ターミナルでフロントを配信:
@@ -67,7 +69,7 @@ python3 -m http.server 8812
 
 ```bash
 cd backend
-python -m pytest
+uv run pytest
 ```
 
 Validation層の各ルール（未知region/diseaseのflag、定点当たり報告数の範囲チェック、
