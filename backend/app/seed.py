@@ -19,6 +19,13 @@ SOURCES = {
     "北九州市": FIXTURES_DIR / "kitakyushu_sample.csv",
     "京都府": FIXTURES_DIR / "kyoto_sample.html",
     "沖縄県": FIXTURES_DIR / "okinawa_sample.xlsx",
+    # 山梨県のみ、他と異なり実際にダウンロードした本物のオープンデータ(2026年1-5週分)。
+    # 出典: https://catalog.dataplatform-yamanashi.jp/dataset/11595_survey_yamanashi_week
+    "山梨県": FIXTURES_DIR / "yamanashi_sample.csv",
+}
+
+_REAL_DATA_SOURCE_URLS = {
+    "山梨県": "https://catalog.dataplatform-yamanashi.jp/dataset/a7f43811-ef7d-49c6-9182-fa7bfabdfbf5/resource/674e45f2-145c-430d-af18-d228c7e0510c/download/11595_survey_yamanashi_week.csv",
 }
 
 
@@ -33,7 +40,8 @@ def run(reset: bool = True) -> dict:
     for prefecture, path in SOURCES.items():
         parser = PARSERS[prefecture]
         raw_bytes = path.read_bytes()
-        raw_records = parser(raw_bytes, source_url=f"local-fixture://{path.name}")
+        source_url = _REAL_DATA_SOURCE_URLS.get(prefecture, f"local-fixture://{path.name}")
+        raw_records = parser(raw_bytes, source_url=source_url)
         validated = validate_records(raw_records, session)
         for v in validated:
             session.add(

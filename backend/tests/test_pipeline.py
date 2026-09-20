@@ -106,6 +106,7 @@ def test_all_extract_parsers_run_against_fixtures():
         "北九州市": "kitakyushu_sample.csv",
         "京都府": "kyoto_sample.html",
         "沖縄県": "okinawa_sample.xlsx",
+        "山梨県": "yamanashi_sample.csv",
     }
     for prefecture, filename in sources.items():
         raw_bytes = (FIXTURES_DIR / filename).read_bytes()
