@@ -25,7 +25,7 @@ def make_raw(**overrides) -> RawRecord:
         week_number=20,
         week_start_date=datetime(2025, 5, 12),
         prefecture="京都府",
-        region="京都市",
+        region="南・伏見",
         disease="インフルエンザ",
         patient_count=10,
         per_sentinel_count=2.5,
@@ -73,7 +73,7 @@ def test_week_over_week_spike_is_flagged():
             week_number=19,
             week_start_date=datetime(2025, 5, 5),
             prefecture="京都府",
-            region="京都市",
+            region="南・伏見",
             disease="influenza",
             patient_count=4,
             per_sentinel_count=1.0,
@@ -104,8 +104,9 @@ def test_all_extract_parsers_run_against_fixtures():
         "神奈川県": "kanagawa_sample.csv",
         "千葉市": "chiba_city_sample.csv",
         "北九州市": "kitakyushu_sample.csv",
-        "京都府": "kyoto_sample.html",
+        "京都府": "kyoto_sample.csv",
         "沖縄県": "okinawa_sample.xlsx",
+        "山梨県": "yamanashi_sample.csv",
     }
     for prefecture, filename in sources.items():
         raw_bytes = (FIXTURES_DIR / filename).read_bytes()
