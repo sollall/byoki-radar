@@ -1,0 +1,65 @@
+"""Raw層(fixtures/) -> Extract層 -> Validation層 -> Store層(DB) を一通り実行する。
+
+`python -m app.seed` で実行する。実運用ではRaw層取得(定期クロール)と
+このロード処理は別ジョブ(Dagster asset chain, spec section 8)になるが、
+PoC/MVPでは同一スクリプトにまとめている。
+"""
+
+from pathlib import Path
+
+from .db import InfectiousDiseaseReport, init_db, get_session
+from .extract import PARSERS
+from .validation import validate_records
+
+FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures"
+
+SOURCES = {
+    "神奈川県": FIXTURES_DIR / "kanagawa_sample.csv",
+    "千葉市": FIXTURES_DIR / "chiba_city_sample.csv",
+    "北九州市": FIXTURES_DIR / "kitakyushu_sample.csv",
+    "京都府": FIXTURES_DIR / "kyoto_sample.html",
+    "沖縄県": FIXTURES_DIR / "okinawa_sample.xlsx",
+}
+
+
+def run(reset: bool = True) -> dict:
+    init_db()
+    session = get_session()
+    if reset:
+        session.query(InfectiousDiseaseReport).delete()
+        session.commit()
+
+    summary = {"passed": 0, "flagged": 0}
+    for prefecture, path in SOURCES.items():
+        parser = PARSERS[prefecture]
+        raw_bytes = path.read_bytes()
+        raw_records = parser(raw_bytes, source_url=f"local-fixture://{path.name}")
+        validated = validate_records(raw_records, session)
+        for v in validated:
+            session.add(
+                InfectiousDiseaseReport(
+                    year=v.year,
+                    week_number=v.week_number,
+                    week_start_date=v.week_start_date,
+                    prefecture=v.prefecture,
+                    region=v.region,
+                    disease=v.disease,
+                    patient_count=v.patient_count,
+                    per_sentinel_count=v.per_sentinel_count,
+                    source_tier=v.source_tier,
+                    source_url=v.source_url,
+                    extracted_by=v.extracted_by,
+                    fetched_at=v.fetched_at,
+                    validation_status=v.validation_status,
+                    flag_reason=v.flag_reason,
+                )
+            )
+            summary[v.validation_status] += 1
+        session.commit()
+    session.close()
+    return summary
+
+
+if __name__ == "__main__":
+    result = run()
+    print(f"passed={result['passed']} flagged={result['flagged']}")
