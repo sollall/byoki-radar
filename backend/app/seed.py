@@ -14,18 +14,19 @@ from .validation import validate_records
 FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures"
 
 SOURCES = {
+    # 神奈川県・京都府・山梨県は、他と異なり実際にダウンロードした本物のオープンデータ。
     "神奈川県": FIXTURES_DIR / "kanagawa_sample.csv",
     "千葉市": FIXTURES_DIR / "chiba_city_sample.csv",
     "北九州市": FIXTURES_DIR / "kitakyushu_sample.csv",
-    "京都府": FIXTURES_DIR / "kyoto_sample.html",
+    "京都府": FIXTURES_DIR / "kyoto_sample.csv",
     "沖縄県": FIXTURES_DIR / "okinawa_sample.xlsx",
-    # 山梨県のみ、他と異なり実際にダウンロードした本物のオープンデータ(2026年1-5週分)。
-    # 出典: https://catalog.dataplatform-yamanashi.jp/dataset/11595_survey_yamanashi_week
     "山梨県": FIXTURES_DIR / "yamanashi_sample.csv",
 }
 
 _REAL_DATA_SOURCE_URLS = {
     "山梨県": "https://catalog.dataplatform-yamanashi.jp/dataset/a7f43811-ef7d-49c6-9182-fa7bfabdfbf5/resource/674e45f2-145c-430d-af18-d228c7e0510c/download/11595_survey_yamanashi_week.csv",
+    "神奈川県": "https://www.pref.kanagawa.jp/sys/eiken/003_center/0001_weekly/csv/2026_influenza.csv",
+    "京都府": "https://www.pref.kyoto.jp/idsc/data/week/area-map/2026/documents/202637_2-2-5.csv",
 }
 
 
