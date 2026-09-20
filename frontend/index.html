@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>感染症マップ (PoC)</title>
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header>
+  <h1>感染症マップ <span class="subtitle">定点当たり報告数 PoC</span></h1>
+  <div class="controls">
+    <label>疾患
+      <select id="disease-select"></select>
+    </label>
+    <label>週
+      <select id="week-select"></select>
+    </label>
+  </div>
+</header>
+
+<main>
+  <div id="map"></div>
+  <aside id="side-panel">
+    <div id="legend"></div>
+    <div id="no-data-banner" hidden>この週はこの疾患の報告がありません（全地域0件）。データが無いのではなく「流行なし」を意味します。</div>
+    <h2 id="drilldown-title">保健所管区別の内訳</h2>
+    <p id="drilldown-hint">地図上の都道府県（神奈川県・京都府・沖縄県）をクリックすると、保健所管区別の内訳が表示されます。</p>
+    <table id="drilldown-table" hidden>
+      <thead><tr><th>管区</th><th>患者数</th><th>定点当たり報告数</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </aside>
+</main>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
