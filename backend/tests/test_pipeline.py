@@ -122,3 +122,25 @@ def test_extract_then_validate_end_to_end_passes():
     validated = validate_records(raw_records, session)
     assert len(validated) == len(raw_records)
     assert all(v.validation_status == "passed" for v in validated)
+
+
+def test_fukui_parse_pair_merges_report_and_sentinel():
+    from app.extract import fukui
+
+    report_bytes = (FIXTURES_DIR / "fukui_zenken_report.csv").read_bytes()
+    sentinel_bytes = (FIXTURES_DIR / "fukui_zenken_sentinel.csv").read_bytes()
+    records = fukui.parse_pair(report_bytes, sentinel_bytes, report_source_url="test")
+
+    assert all(r.prefecture == "福井県" for r in records)
+    week38_influenza = next(
+        r for r in records if r.week_number == 38 and r.disease == "ｲﾝﾌﾙｴﾝｻﾞ"
+    )
+    assert week38_influenza.patient_count == 117
+    assert week38_influenza.per_sentinel_count == 3.0
+
+    # 週37は報告実数ファイルにしかないため、per_sentinel_countはNoneのまま
+    week37_influenza = next(
+        r for r in records if r.week_number == 37 and r.disease == "ｲﾝﾌﾙｴﾝｻﾞ"
+    )
+    assert week37_influenza.patient_count == 76
+    assert week37_influenza.per_sentinel_count is None

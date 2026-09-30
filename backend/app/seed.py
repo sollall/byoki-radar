@@ -9,12 +9,13 @@ from pathlib import Path
 
 from .db import InfectiousDiseaseReport, init_db, get_session
 from .extract import PARSERS
+from .extract import fukui
 from .validation import validate_records
 
 FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures"
 
 SOURCES = {
-    # 神奈川県・京都府・山梨県は、他と異なり実際にダウンロードした本物のオープンデータ。
+    # 神奈川県・京都府・山梨県・福井県は、他と異なり実際にダウンロードした本物のオープンデータ。
     "神奈川県": FIXTURES_DIR / "kanagawa_sample.csv",
     "千葉市": FIXTURES_DIR / "chiba_city_sample.csv",
     "北九州市": FIXTURES_DIR / "kitakyushu_sample.csv",
@@ -28,6 +29,37 @@ _REAL_DATA_SOURCE_URLS = {
     "神奈川県": "https://www.pref.kanagawa.jp/sys/eiken/003_center/0001_weekly/csv/2026_influenza.csv",
     "京都府": "https://www.pref.kyoto.jp/idsc/data/week/area-map/2026/documents/202637_2-2-5.csv",
 }
+
+# 福井県は「報告実数」「定点当たり報告数」が保健所ごとに別ファイルで配布されており、
+# 通常のparse(raw_bytes, source_url)一本では表現できないため個別に扱う(fukui.parse_pair参照)。
+FUKUI_REPORT_SOURCE = FIXTURES_DIR / "fukui_zenken_report.csv"
+FUKUI_SENTINEL_SOURCE = FIXTURES_DIR / "fukui_zenken_sentinel.csv"
+FUKUI_REPORT_URL = "https://kansensyou-joho.pref.fukui.lg.jp/csv/ih5100001.csv"
+FUKUI_SENTINEL_URL = "https://kansensyou-joho.pref.fukui.lg.jp/csv/ih5100000.csv"
+
+
+def _store(raw_records, session, summary: dict) -> None:
+    for v in validate_records(raw_records, session):
+        session.add(
+            InfectiousDiseaseReport(
+                year=v.year,
+                week_number=v.week_number,
+                week_start_date=v.week_start_date,
+                prefecture=v.prefecture,
+                region=v.region,
+                disease=v.disease,
+                patient_count=v.patient_count,
+                per_sentinel_count=v.per_sentinel_count,
+                source_tier=v.source_tier,
+                source_url=v.source_url,
+                extracted_by=v.extracted_by,
+                fetched_at=v.fetched_at,
+                validation_status=v.validation_status,
+                flag_reason=v.flag_reason,
+            )
+        )
+        summary[v.validation_status] += 1
+    session.commit()
 
 
 def run(reset: bool = True) -> dict:
@@ -43,28 +75,16 @@ def run(reset: bool = True) -> dict:
         raw_bytes = path.read_bytes()
         source_url = _REAL_DATA_SOURCE_URLS.get(prefecture, f"local-fixture://{path.name}")
         raw_records = parser(raw_bytes, source_url=source_url)
-        validated = validate_records(raw_records, session)
-        for v in validated:
-            session.add(
-                InfectiousDiseaseReport(
-                    year=v.year,
-                    week_number=v.week_number,
-                    week_start_date=v.week_start_date,
-                    prefecture=v.prefecture,
-                    region=v.region,
-                    disease=v.disease,
-                    patient_count=v.patient_count,
-                    per_sentinel_count=v.per_sentinel_count,
-                    source_tier=v.source_tier,
-                    source_url=v.source_url,
-                    extracted_by=v.extracted_by,
-                    fetched_at=v.fetched_at,
-                    validation_status=v.validation_status,
-                    flag_reason=v.flag_reason,
-                )
-            )
-            summary[v.validation_status] += 1
-        session.commit()
+        _store(raw_records, session, summary)
+
+    fukui_records = fukui.parse_pair(
+        FUKUI_REPORT_SOURCE.read_bytes(),
+        FUKUI_SENTINEL_SOURCE.read_bytes(),
+        report_source_url=FUKUI_REPORT_URL,
+        sentinel_source_url=FUKUI_SENTINEL_URL,
+    )
+    _store(fukui_records, session, summary)
+
     session.close()
     return summary
 
