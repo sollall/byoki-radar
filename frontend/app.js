@@ -7,15 +7,28 @@ const CITY_MARKERS = {
   "北九州市": [33.8834, 130.8752],
 };
 
+// 保健所管区ポリゴンを持つ自治体。市区町村ポリゴン(japan-choropleth, 国土数値情報
+// 行政区域データ2025年版を加工)を、各県公式の管轄区域案内に基づいて結合(dissolve)して
+// 作成したもの(scripts/build_region_polygons.py参照)。クリックした県だけこちらの
+// ポリゴンにズームして管区別に色分けする。
+const REGION_POLYGON_SOURCES = {
+  "京都府": "region_polygons/kyoto.geojson",
+};
+const regionPolygonCache = new Map();
+
 const map = L.map("map").setView([36.5, 137.5], 5);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: "&copy; OpenStreetMap contributors",
+  attribution:
+    '&copy; OpenStreetMap contributors / 保健所管区ポリゴンは<a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-2025.html">国土数値情報「行政区域データ2025年版」(国土交通省, CC BY 4.0)</a>を加工',
   maxZoom: 12,
 }).addTo(map);
 
 let geoLayer = null;
 let cityMarkerLayer = L.layerGroup().addTo(map);
 let latestReport = null;
+let regionPolygonLayer = null;
+let zoomedPrefecture = null;
+const JAPAN_VIEW = { center: [36.5, 137.5], zoom: 5 };
 
 const NO_DATA_COLOR = "#999999";
 const NO_VALUE_COLOR = "#e5e5e5"; // MVP対象外の都道府県(データなし)
@@ -63,6 +76,46 @@ function aggregateByPrefecture(items) {
     result.set(prefecture, { avg, regionItems });
   }
   return result;
+}
+
+function resetZoom() {
+  if (regionPolygonLayer) {
+    map.removeLayer(regionPolygonLayer);
+    regionPolygonLayer = null;
+  }
+  zoomedPrefecture = null;
+  document.getElementById("back-to-japan").hidden = true;
+  map.setView(JAPAN_VIEW.center, JAPAN_VIEW.zoom);
+}
+
+async function showRegionPolygons(prefecture, regionItems, report) {
+  const path = REGION_POLYGON_SOURCES[prefecture];
+  if (!path) return;
+
+  if (!regionPolygonCache.has(path)) {
+    regionPolygonCache.set(path, await fetch(path).then((r) => r.json()));
+  }
+  const geojson = regionPolygonCache.get(path);
+  const valueByRegion = new Map(regionItems.map((item) => [item.region, item]));
+
+  if (regionPolygonLayer) map.removeLayer(regionPolygonLayer);
+  zoomedPrefecture = prefecture;
+  regionPolygonLayer = L.geoJSON(geojson, {
+    style: (feature) => {
+      const entry = valueByRegion.get(feature.properties.region);
+      const fill =
+        entry && !report.no_data ? colorScale(entry.value, report.scale_min, report.scale_max) : NO_VALUE_COLOR;
+      return { color: "#666", weight: 1, fillOpacity: 0.85, fillColor: fill, fill: true };
+    },
+    onEachFeature: (feature, layer) => {
+      const entry = valueByRegion.get(feature.properties.region);
+      layer.bindTooltip(
+        `${feature.properties.region}: ${entry && !report.no_data ? entry.value?.toFixed(2) : "-"}`
+      );
+    },
+  }).addTo(map);
+  map.fitBounds(regionPolygonLayer.getBounds(), { padding: [16, 16] });
+  document.getElementById("back-to-japan").hidden = false;
 }
 
 function renderDrilldown(prefecture, regionItems) {
@@ -123,7 +176,10 @@ function renderMap(report) {
         entry ? `${name}: ${report.no_data ? "報告なし" : entry.avg?.toFixed(2)}` : `${name}（対象外）`
       );
       if (entry) {
-        layer.on("click", () => renderDrilldown(name, entry.regionItems));
+        layer.on("click", () => {
+          renderDrilldown(name, entry.regionItems);
+          if (REGION_POLYGON_SOURCES[name]) showRegionPolygons(name, entry.regionItems, report);
+        });
         if (report.no_data) {
           layer.once("add", () => {
             ensureHatchPattern();
@@ -151,6 +207,17 @@ function renderMap(report) {
   }
 
   renderLegend(report);
+
+  // 疾患/週を切り替えても、ズーム中の県があれば同じ県のポリゴンを新しい値で描き直す
+  if (zoomedPrefecture) {
+    const entry = byPrefecture.get(zoomedPrefecture);
+    if (entry) {
+      renderDrilldown(zoomedPrefecture, entry.regionItems);
+      showRegionPolygons(zoomedPrefecture, entry.regionItems, report);
+    } else {
+      resetZoom();
+    }
+  }
 }
 
 async function loadReport() {
@@ -181,6 +248,7 @@ async function init() {
 
   diseaseSelect.addEventListener("change", loadReport);
   weekSelect.addEventListener("change", loadReport);
+  document.getElementById("back-to-japan").addEventListener("click", resetZoom);
 
   await loadReport();
 }
