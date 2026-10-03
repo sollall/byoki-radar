@@ -13,6 +13,9 @@ const CITY_MARKERS = {
 // ポリゴンにズームして管区別に色分けする。
 const REGION_POLYGON_SOURCES = {
   "京都府": "region_polygons/kyoto.geojson",
+  "神奈川県": "region_polygons/kanagawa.geojson",
+  "福井県": "region_polygons/fukui.geojson",
+  "沖縄県": "region_polygons/okinawa.geojson",
 };
 const regionPolygonCache = new Map();
 
