@@ -25,7 +25,7 @@ def make_raw(**overrides) -> RawRecord:
         week_number=20,
         week_start_date=datetime(2025, 5, 12),
         prefecture="京都府",
-        region="京都市",
+        region="南・伏見",
         disease="インフルエンザ",
         patient_count=10,
         per_sentinel_count=2.5,
@@ -73,7 +73,7 @@ def test_week_over_week_spike_is_flagged():
             week_number=19,
             week_start_date=datetime(2025, 5, 5),
             prefecture="京都府",
-            region="京都市",
+            region="南・伏見",
             disease="influenza",
             patient_count=4,
             per_sentinel_count=1.0,
@@ -104,8 +104,9 @@ def test_all_extract_parsers_run_against_fixtures():
         "神奈川県": "kanagawa_sample.csv",
         "千葉市": "chiba_city_sample.csv",
         "北九州市": "kitakyushu_sample.csv",
-        "京都府": "kyoto_sample.html",
+        "京都府": "kyoto_sample.csv",
         "沖縄県": "okinawa_sample.xlsx",
+        "山梨県": "yamanashi_sample.csv",
     }
     for prefecture, filename in sources.items():
         raw_bytes = (FIXTURES_DIR / filename).read_bytes()
@@ -121,3 +122,25 @@ def test_extract_then_validate_end_to_end_passes():
     validated = validate_records(raw_records, session)
     assert len(validated) == len(raw_records)
     assert all(v.validation_status == "passed" for v in validated)
+
+
+def test_fukui_parse_pair_merges_report_and_sentinel():
+    from app.extract import fukui
+
+    report_bytes = (FIXTURES_DIR / "fukui_zenken_report.csv").read_bytes()
+    sentinel_bytes = (FIXTURES_DIR / "fukui_zenken_sentinel.csv").read_bytes()
+    records = fukui.parse_pair(report_bytes, sentinel_bytes, report_source_url="test")
+
+    assert all(r.prefecture == "福井県" for r in records)
+    week38_influenza = next(
+        r for r in records if r.week_number == 38 and r.disease == "ｲﾝﾌﾙｴﾝｻﾞ"
+    )
+    assert week38_influenza.patient_count == 117
+    assert week38_influenza.per_sentinel_count == 3.0
+
+    # 週37は報告実数ファイルにしかないため、per_sentinel_countはNoneのまま
+    week37_influenza = next(
+        r for r in records if r.week_number == 37 and r.disease == "ｲﾝﾌﾙｴﾝｻﾞ"
+    )
+    assert week37_influenza.patient_count == 76
+    assert week37_influenza.per_sentinel_count is None

@@ -2,6 +2,7 @@
 ValidatedRecordに変換する。抽出手段(pandas/llm)によらず同じルールを適用する。
 """
 
+import unicodedata
 from collections import defaultdict
 from datetime import datetime
 from typing import Iterable
@@ -15,12 +16,14 @@ from .schemas import RawRecord, ValidatedRecord
 
 # 自治体表記のゆれ -> 内部enumコードへのマッピング。
 # 未知の表記は正規化できないため、そのまま(コード化されずに)flaggedとなる。
-_DISEASE_LABEL_TO_CODE = {v["label"]: k for k, v in DISEASES.items()}
+# 全角/半角の差(例: "ＲＳウイルス感染症" と "RSウイルス感染症")はNFKC正規化で吸収するが、
+# 表記自体が異なる別名(例: 略称違い)は推測で丸めない(spec 5.1)。
+_DISEASE_LABEL_TO_CODE = {unicodedata.normalize("NFKC", v["label"]): k for k, v in DISEASES.items()}
 
 
 def _normalize_disease(raw_label: str) -> tuple[str, bool]:
     """(コードまたは元の表記, 既知disease かどうか) を返す。丸めは行わない。"""
-    code = _DISEASE_LABEL_TO_CODE.get(raw_label.strip())
+    code = _DISEASE_LABEL_TO_CODE.get(unicodedata.normalize("NFKC", raw_label.strip()))
     if code is not None:
         return code, True
     return raw_label, False
