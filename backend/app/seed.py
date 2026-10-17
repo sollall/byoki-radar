@@ -32,10 +32,18 @@ _REAL_DATA_SOURCE_URLS = {
 
 # 福井県は「報告実数」「定点当たり報告数」が保健所ごとに別ファイルで配布されており、
 # 通常のparse(raw_bytes, source_url)一本では表現できないため個別に扱う(fukui.parse_pair参照)。
-FUKUI_REPORT_SOURCE = FIXTURES_DIR / "fukui_zenken_report.csv"
-FUKUI_SENTINEL_SOURCE = FIXTURES_DIR / "fukui_zenken_sentinel.csv"
-FUKUI_REPORT_URL = "https://kansensyou-joho.pref.fukui.lg.jp/csv/ih5100001.csv"
-FUKUI_SENTINEL_URL = "https://kansensyou-joho.pref.fukui.lg.jp/csv/ih5100000.csv"
+# URL規則: ih51{前年1|当年0}{保健所2桁}{定点0|実数1}.csv
+# (00全県,01福井市,02福井,03坂井,04二州,05若狭,06奥越,07丹南)
+FUKUI_CENTERS = [
+    ("zenken", "00"),
+    ("fukuishi", "01"),
+    ("fukui", "02"),
+    ("sakai", "03"),
+    ("nishu", "04"),
+    ("wakasa", "05"),
+    ("okuetsu", "06"),
+    ("tannan", "07"),
+]
 
 
 def _store(raw_records, session, summary: dict) -> None:
@@ -77,13 +85,16 @@ def run(reset: bool = True) -> dict:
         raw_records = parser(raw_bytes, source_url=source_url)
         _store(raw_records, session, summary)
 
-    fukui_records = fukui.parse_pair(
-        FUKUI_REPORT_SOURCE.read_bytes(),
-        FUKUI_SENTINEL_SOURCE.read_bytes(),
-        report_source_url=FUKUI_REPORT_URL,
-        sentinel_source_url=FUKUI_SENTINEL_URL,
-    )
-    _store(fukui_records, session, summary)
+    for slug, code in FUKUI_CENTERS:
+        report_path = FIXTURES_DIR / f"fukui_{slug}_report.csv"
+        sentinel_path = FIXTURES_DIR / f"fukui_{slug}_sentinel.csv"
+        fukui_records = fukui.parse_pair(
+            report_path.read_bytes(),
+            sentinel_path.read_bytes(),
+            report_source_url=f"https://kansensyou-joho.pref.fukui.lg.jp/csv/ih5100{code}1.csv",
+            sentinel_source_url=f"https://kansensyou-joho.pref.fukui.lg.jp/csv/ih5100{code}0.csv",
+        )
+        _store(fukui_records, session, summary)
 
     session.close()
     return summary
